@@ -158,7 +158,6 @@ bool isDeclarationStatement(string s){
 }
 	
 
-
 int main(int argc, char **argv){
 	if (argc != 2){
 		std::cout << "Enter filename " << std::endl;
