@@ -26,8 +26,11 @@
 
 using namespace std;
 
+bool checkWarnings(string s);
+
 template<typename FwdIter>
-FwdIter replace_whitespace_by_one_space(FwdIter begin, FwdIter end)
+// replace whitespace by one space
+FwdIter normalize_space(FwdIter begin, FwdIter end)
 {
 	FwdIter dst = begin;
 IGNORE_LEADING_WHITESPACE:
@@ -75,9 +78,13 @@ vector<string> split(const char *str, char c = ' ')
 	do
 	{
 		const char *begin = str;
-		while(*str != c && *str && *str != d && *str != e && *str != f)
+		while(*str != c
+			&& *str
+			&& *str != d
+			&& *str != e
+			&& *str != f)
 			str++;
-		result.push_back(string(begin, str));
+			result.push_back(string(begin, str));
 	} while (0 != *str++);
 	return result;
 }
@@ -100,9 +107,8 @@ void printDecl(string _s, string fun_name){
 			for(auto it : V3){
 				std::cout << it << " ";
 				if(it.find(",") != string::npos){
-					std::cout << "\t\tXXX COMMA DETECTED,\
-					 PLEASE CHANGE IT TO SINGLE STATEMENT" << std::endl;
-				}if(it.find("[") != string::npos){
+					std::cout << "\t\tXXX COMMA DETECTED" << std::endl;
+				}else if(it.find("[") != string::npos){
 					std::cout << "\t\tXXX ARRAY DETECTED" << std::endl;
 				}
 			}
@@ -112,6 +118,12 @@ void printDecl(string _s, string fun_name){
 			std::cout << std::endl; 
 		}
 	}
+}
+
+bool isStructStatement(string s){
+	if(s.find("struct ") !=string::npos
+		&& std::count (s.begin(), s.end(), '{'))
+		return true;
 }
 
 bool isFunctionStatement(string s){
@@ -128,10 +140,13 @@ bool isFunctionStatement(string s){
 		&& s.find("#define") == string::npos
 		&& s.find("#include") == string::npos
 		&& s.find("while") == string::npos
-		&& s.find("switch") == string::npos
-		&& (std::count (s.begin(), s.end(), '(') == std::count (s.begin(), s.end(), ')')))
+		&& s.find("switch") == string::npos)
 	 { 
-		return true;
+		if(std::count (s.begin(), s.end(), '(')
+			== std::count (s.begin(), s.end(), ')'))
+			return true;
+		else
+			checkWarnings(s);
 	 }
 	return false;
 }
@@ -148,6 +163,7 @@ bool isDeclarationStatement(string s){
 		(s.find ("float ") !=string::npos)
 		|| (s.find ("uint32_t ") !=string::npos)
 		|| (s.find ("uint64_t ") !=string::npos)
+		|| (s.find ("inode_type ") !=string::npos)	// XXX hardcoded
 		|| (s.find ("struct ") !=string::npos)
 		|| (s.find ("int ") !=string::npos)
 		|| (s.find ("char ") !=string::npos)
@@ -159,9 +175,27 @@ bool isDeclarationStatement(string s){
 	return false;
 }
 	
-bool anyWarnings(string s){
-	if(s.find("/*") !=string::npos && s.find("*/") != string::npos && s.find(";") != string::npos )
-		return true;
+bool checkWarnings(string s){
+	bool warn = false;
+	if(s.find("/*") !=string::npos
+		&& s.find("*/") != string::npos
+		&& s.find(";") != string::npos )
+		warn = true;
+	else if(std::count (s.begin(), s.end(), '(')
+		!= std::count (s.begin(), s.end(), ')'))
+		warn = true;
+	if(warn)
+		std::cout << s << "WARNING" << std::endl;
+}
+
+void formatAndPrint(string s, string fun_name){
+	auto new_end = normalize_space(s.begin(), s.end());
+	s.erase(new_end, s.end());
+	string _s;
+	if(!s.empty()){
+		s.erase(s.find_first_of(";="), s.length());
+		printDecl(s,fun_name);
+	}
 }
 
 int main(int argc, char **argv){
@@ -181,9 +215,6 @@ int main(int argc, char **argv){
 	string fun_name_full;
 	while(std::getline(file,s)){
 		// if statement is function
-		if(anyWarnings(s)){
-			std::cout << s << "WARNING" << std::endl;
-		}
 		if(isFunctionStatement(s)){
 			fun_name.clear();
 			fun_name_full.clear();
@@ -207,15 +238,24 @@ int main(int argc, char **argv){
 				}
 			}
 			std:: cout << endl;
-		// if statement is declaration
-		}else if(isDeclarationStatement(s)){
-			auto new_end = replace_whitespace_by_one_space(s.begin(), s.end());
+		}
+		// if statement is structure declaration
+		else if(isStructStatement(s)){
+			auto new_end = normalize_space(s.begin(), s.end());
 			s.erase(new_end, s.end());
-			string _s;
-			if(!s.empty()){
-				s.erase(s.find_first_of(";="), s.length());
-				printDecl(s,fun_name);		
+			vector<string> V3 = split(s.data());
+			string struct_name = V3[1];
+			struct_name.append(":");
+			string decl;
+			std::getline(file,decl);
+			while(isDeclarationStatement(decl)){
+				formatAndPrint(decl,struct_name);
+				std::getline(file,decl);
 			}
+		}
+		// if statement is declaration
+		else if(isDeclarationStatement(s)){
+			formatAndPrint(s, fun_name);
 		}
 	}
 }
