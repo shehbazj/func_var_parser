@@ -142,6 +142,8 @@ bool isDeclarationStatement(string s){
 		&& (s.find("+=") == string::npos) 
 		&& (s.find("-=") == string::npos) 
 		&& (s.find("for") == string::npos)
+		&& (s.find("memcpy") == string::npos)
+		&& (s.find("bzero") == string::npos)
 		&& (	// one of following expressions exist
 		(s.find ("float ") !=string::npos)
 		|| (s.find ("uint32_t ") !=string::npos)
@@ -157,6 +159,10 @@ bool isDeclarationStatement(string s){
 	return false;
 }
 	
+bool anyWarnings(string s){
+	if(s.find("/*") !=string::npos && s.find("*/") != string::npos && s.find(";") != string::npos )
+		return true;
+}
 
 int main(int argc, char **argv){
 	if (argc != 2){
@@ -175,6 +181,9 @@ int main(int argc, char **argv){
 	string fun_name_full;
 	while(std::getline(file,s)){
 		// if statement is function
+		if(anyWarnings(s)){
+			std::cout << s << "WARNING" << std::endl;
+		}
 		if(isFunctionStatement(s)){
 			fun_name.clear();
 			fun_name_full.clear();
