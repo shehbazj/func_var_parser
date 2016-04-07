@@ -22,6 +22,8 @@ Data Structure Generator.
 #include<fstream>
 #include<map>
 #include<algorithm>
+#include<cstring>
+#include<cstdio>
 
 using namespace std;
 
@@ -95,19 +97,102 @@ string getSize(string s){
 	return s.substr(found+1);
 }
 
-/*
+string normalize(string s){
+	char chars[] = " &*.";
+   for (unsigned int i = 0; i < strlen(chars); ++i)
+   {
+      // you need include <algorithm> to use general algorithms like std::remove()
+      s.erase (std::remove(s.begin(), s.end(), chars[i]), s.end());
+   }
+	return s;
+}
+
+vector<string> split(const char *str, char c = ' ')
+{
+        vector<string> result;
+        char d = '(';
+        char e = '{';
+        char f = ')';
+        do
+        {
+                const char *begin = str;
+                while(*str != c
+                        && *str
+                        && *str != d
+                        && *str != e
+                        && *str != f)
+                        str++;
+                        result.push_back(string(begin, str));
+        } while (0 != *str++);
+        return result;
+}
+
+string getStructName(string s){
+	size_t found = s.find("struct ");
+	if(found != string::npos){
+		vector <string > V = split(s.data());
+		return V[1];
+	}	
+	return std::string("");
+}
+
+//bitmap_create:b->v
+//testfs_get_inode:&in->in
+//testfs_init_super_block:&sb->sb
+
+string getStructElementKey(string s){
+	string subElement = s.substr(s.find_last_of(".->") + 1, s.length() - s.find_last_of(".->") - 1);
+	string structDef  = normalize(s.substr(0,s.find_first_of(".->")));
+//	std::cout << "structDef " << structDef << std::endl;
+	string structType = variable_type_map[structDef];
+//	std::cout << "structType " << structType << std::endl;
+	string structName = getStructName(structType); 
+//	std::cout << "structName " << structName << std::endl;
+	structName.append("::");
+	string structKey = structName.append(subElement);
+	return structKey;
+}
+
+//testfs_read_data:buf + buf_offset
+//testfs_read_data:block + b_offset
+//testfs_get_inode:block + block_offset
+//testfs_init_super_block:block
+
 string getKey(string s){
 	string var;
 	size_t found;
+	if(s.find("+") != string::npos)
+		return s.substr(0, s.find_first_of(" +"));
+	if(s.find(".") != string::npos || s.find("->") != string::npos)
+		return getStructElementKey(s); 
 	if(s.find(":") == string::npos)
 		return var;
-	if(s.find(".") == string::npos && s.find("->") == string::npos)
+	else
 		return s;
-	else{
-		var = s.find(":");	
-	}
 }
-*/
+
+bool isValid(string A){
+	return A.compare("999999");
+}
+
+string getValue(string key1, string key2){
+	string value1 = variable_type_map[key1];
+	if(value1.empty())
+		value1 = struct_element_map[key1];
+	if (value1.empty())
+		return value1;	// return NULL
+
+	string value2 = variable_type_map[key2];
+	if(value2.empty())
+		value2 = struct_element_map[key2];
+	if (value2.empty())
+		return value1;	// return value 1
+
+	if (value1.find("struct") != string::npos)
+		return value1;
+	else 
+		return value2;
+}
 
 int main(int argc, char *argv[]){
 	if(argc != 3){
@@ -139,15 +224,19 @@ int main(int argc, char *argv[]){
 	while(std::getline(trace_file,s)){
 		if(isDSTRUCT(s)){
 			Address = getAddress(s);
-			Size = getSize(s);		
-/*			key1 = getKey(std::getline(trace_file,s));
-			key2 = getKey(std::getline(trace_file,s));
-			diskBlockType = getValue(key1, key2);
-			if(!diskBlockType.empty())
-				std::cout << Address << ":" << Size 
-					<< ":" << diskBlockType << std::endl;	
-*/
-		std::cout << Address <<  ":" << Size << std::endl;
+			Size = getSize(s);
+			std::getline(trace_file,s);		
+//			std::cout << "Next Line " << s << std::endl;
+			key1 = getKey(s);
+			if(!key1.empty()){
+				std::getline(trace_file,s);		
+				key2 = getKey(s);
+				diskBlockType = getValue(key1, key2);
+				//std::cout << "diskBlockType " << diskBlockType << std::endl; 
+				if(!diskBlockType.empty() && isValid(Address))
+					std::cout << Address << ":" << Size 
+						<< ":" << diskBlockType << std::endl;	
+			}
 		}
 	}
 }
