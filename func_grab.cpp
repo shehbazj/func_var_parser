@@ -199,63 +199,67 @@ void formatAndPrint(string s, string fun_name){
 }
 
 int main(int argc, char **argv){
-	if (argc != 2){
+	if (argc < 2){
 		std::cout << "Enter filename " << std::endl;
 		return 1;
 	}
 
-	ifstream file(argv[1]);
-	if (!file) {
-		cout << "unable to open file";
-		exit(1);
-	}	
-
-	std::string s;
-	string fun_name;
-	string fun_name_full;
-	while(std::getline(file,s)){
-		// if statement is function
-		if(isFunctionStatement(s)){
-			fun_name.clear();
-			fun_name_full.clear();
-			vector<string> V = split(s.data() , ',');
-			bool fname = true;
-			for (auto it : V){
-				if (fname){
-					fun_name_full.append(it);
-					vector <string> V2 = split(fun_name_full.data());
-					fun_name.append(V2.back());
-					fname = false;
-				}else{
-					string _s(it);
-					while	(!_s.empty() && _s.at(0) == ' '){
-						_s.erase(_s.begin(), _s.begin() +1 );
-					}
-					
-					if(!_s.empty()){
-						printDecl(_s, fun_name);
+	int fileNo=1;
+	while(fileNo!= argc){
+		ifstream file(argv[fileNo]);
+		if (!file) {
+			cout << "unable to open file";
+			exit(1);
+		}	
+	
+		std::string s;
+		string fun_name;
+		string fun_name_full;
+		while(std::getline(file,s)){
+			// if statement is function
+			if(isFunctionStatement(s)){
+				fun_name.clear();
+				fun_name_full.clear();
+				vector<string> V = split(s.data() , ',');
+				bool fname = true;
+				for (auto it : V){
+					if (fname){
+						fun_name_full.append(it);
+						vector <string> V2 = split(fun_name_full.data());
+						fun_name.append(V2.back());
+						fname = false;
+					}else{
+						string _s(it);
+						while	(!_s.empty() && _s.at(0) == ' '){
+							_s.erase(_s.begin(), _s.begin() +1 );
+						}
+						
+						if(!_s.empty()){
+							printDecl(_s, fun_name);
+						}
 					}
 				}
+				std:: cout << endl;
 			}
-			std:: cout << endl;
-		}
-		// if statement is structure declaration
-		else if(isStructStatement(s)){
-			auto new_end = normalize_space(s.begin(), s.end());
-			s.erase(new_end, s.end());
-			vector<string> V3 = split(s.data());
-			string struct_name = V3[1];
-			struct_name.append(":");
-			string decl;
-			std::getline(file,decl);
-			while(isDeclarationStatement(decl)){
-				formatAndPrint(decl,struct_name);
+			// if statement is structure declaration
+			else if(isStructStatement(s)){
+				auto new_end = normalize_space(s.begin(), s.end());
+				s.erase(new_end, s.end());
+				vector<string> V3 = split(s.data());
+				string struct_name = V3[1];
+				struct_name.append(":");
+				string decl;
 				std::getline(file,decl);
+				while(isDeclarationStatement(decl)){
+					formatAndPrint(decl,struct_name);
+					std::getline(file,decl);
+				}
+			}
+			// if statement is declaration
+			else if(isDeclarationStatement(s)){
+				formatAndPrint(s, fun_name);
 			}
 		}
-		// if statement is declaration
-		else if(isDeclarationStatement(s)){
-			formatAndPrint(s, fun_name);
-		}
+		fileNo++;
 	}
 }
