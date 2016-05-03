@@ -1,5 +1,6 @@
 /*
    parser for set of functions and local variables of a C program.
+   also parses *.h files for struct information.
    input - *.c file
    output - function_name : variable_name
    variable_name is both the variables declared as arguments as well as

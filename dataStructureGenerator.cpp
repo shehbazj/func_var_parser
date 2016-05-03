@@ -8,9 +8,9 @@ Data Structure Generator.
 	<struct_name::element:type>	    	---> struct_name:element => type
 
 2. read taint trace file which contains symbols in the form
-	DSTRUCT:Addr=A:Size|S
-	<function:variable1>
-	<function:variable2>
+	#DSTRUCT:Addr=A:Size|S
+	#<function:variable1>
+	#<function:variable2>
 
 3. output
 	It gives an output in the form 
@@ -56,6 +56,7 @@ string generateKey(string s){
 		return s;
 	}
 	//std::cout << "ARRAY DETECTED HERE " << s << std::endl;
+	// remove # from beginning
 	return s.substr(0,found);
 }
 
@@ -66,14 +67,20 @@ void generateLookUpTable(ifstream &dict_file)
 	size_t found;
 	// create lookup hash table
 	while(std::getline(dict_file,s)){
+	//	std::cout << s << std::endl;
+		if(s.find(":") == string::npos)
+			continue;
 		found = s.find_last_of(":");
+		// 1 since # needs to be considered
 		string key = generateKey(s.substr(0,found));
 		string value = s.substr(found+1);
 		if(key.compare(s.substr(0,found)))	// array
 			value.append("*");		
 		if(isVariable(s)){
+			//std::cout << "key = " << key << " value = " << value << std::endl;
 			variable_type_map[key] = value;							
 		}else if(isStruct(s)){
+			std::cout << "key = " << key << " value = " << value << std::endl;
 			struct_element_map[key] = value;							
 		}	
 	}
@@ -150,25 +157,41 @@ string getStructElementKey(string s){
 //	std::cout << "structName " << structName << std::endl;
 	structName.append("::");
 	string structKey = structName.append(subElement);
+//	std::cout << "String = " << s  << " struct Key = " << structKey << std::endl;
 	return structKey;
 }
 
-//testfs_read_data:buf + buf_offset
-//testfs_read_data:block + b_offset
-//testfs_get_inode:block + block_offset
-//testfs_init_super_block:block
+// get string in the form #testfs_read_data:buf + buf_offset, return testfs_read_data
+string getFunName(string s){
+	return s.substr(1, s.find_first_of(":") -1);
+}
+
+//#testfs_read_data:buf + buf_offset
+//#testfs_read_data:block + b_offset
+//#testfs_get_inode:block + block_offset
+//#testfs_init_super_block:block
 
 string getKey(string s){
-	string var;
+	string empty("");
 	size_t found;
-	if(s.find("+") != string::npos)
-		return s.substr(0, s.find_first_of(" +"));
+	if(s.find("+") != string::npos){
+			string funName = getFunName(s);
+			funName.append(":");
+		string t = s.substr(s.find_last_of(":") + 1,s.length());
+		string varName = t.substr(0, t.find_first_of(" +"));
+		return funName.append(varName.c_str());
+	}
 	if(s.find(".") != string::npos || s.find("->") != string::npos)
-		return getStructElementKey(s); 
+		// remove # from begining before sending
+		return getStructElementKey(s.substr(1,s.length())); 
 	if(s.find(":") == string::npos)
-		return var;
-	else
-		return s;
+		return empty;
+	else{
+		string funName = getFunName(s);
+		funName.append(":");
+		string varName = s.substr(s.find_last_of(":")+1,s.length());
+		return funName.append(varName.c_str());
+	}
 }
 
 bool isValid(string A){
@@ -177,10 +200,14 @@ bool isValid(string A){
 
 string getValue(string key1, string key2){
 	string value1 = variable_type_map[key1];
-	if(value1.empty())
+	if(value1.empty()){
+//		std::cout << "Cant find key" << key1 << " in variable type map" << std::endl;
 		value1 = struct_element_map[key1];
-	if (value1.empty())
+	}
+	if (value1.empty()){
+		std::cout << "Cant find key" << key1 << " in struct_element_map" << std::endl;
 		return value1;	// return NULL
+	}
 
 	string value2 = variable_type_map[key2];
 	if(value2.empty())
@@ -223,16 +250,22 @@ int main(int argc, char *argv[]){
 
 	while(std::getline(trace_file,s)){
 		if(isDSTRUCT(s)){
+			//std::cout << "Identified DSTRUCT in s " << s << std::endl;
 			Address = getAddress(s);
 			Size = getSize(s);
+//			std::cout << "Extracted Addr " << Address << " Extract Size " << Size << std::endl;
 			std::getline(trace_file,s);		
 //			std::cout << "Next Line " << s << std::endl;
 			key1 = getKey(s);
+	//		std::cout << "Funname = " << funName << std::endl;
+			
 			if(!key1.empty()){
+		//		std::cout << "In string " << s << " Obtained Key " << key1 << std::endl;
 				std::getline(trace_file,s);		
 				key2 = getKey(s);
+		//		std::cout << "In string " << s << " Obtained Key " << key2 << std::endl;
 				diskBlockType = getValue(key1, key2);
-				//std::cout << "diskBlockType " << diskBlockType << std::endl; 
+		//		std::cout << "diskBlockType " << diskBlockType << std::endl; 
 				if(!diskBlockType.empty() && isValid(Address))
 					std::cout << Address << ":" << Size 
 						<< ":" << diskBlockType << std::endl;	
