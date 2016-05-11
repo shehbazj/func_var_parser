@@ -228,6 +228,7 @@ int main(int argc, char **argv){
 						fun_name_full.append(it);
 						vector <string> V2 = split(fun_name_full.data());
 						fun_name.append(V2.back());
+						fun_name.erase(std::remove(fun_name.begin(), fun_name.end(), '*'), fun_name.end());
 						fname = false;
 					}else{
 						string _s(it);

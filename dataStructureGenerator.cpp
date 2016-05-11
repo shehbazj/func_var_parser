@@ -24,11 +24,16 @@ Data Structure Generator.
 #include<algorithm>
 #include<cstring>
 #include<cstdio>
+#include<sstream>
+
+#define BLOCK_SIZE 64
 
 using namespace std;
 
 std::map <string , string> variable_type_map;
 std::map <string , string> struct_element_map;
+
+string traceFile;
 
 // variable value will contain 1 : separator
 bool isVariable(string s){
@@ -80,7 +85,7 @@ void generateLookUpTable(ifstream &dict_file)
 			//std::cout << "key = " << key << " value = " << value << std::endl;
 			variable_type_map[key] = value;							
 		}else if(isStruct(s)){
-			std::cout << "key = " << key << " value = " << value << std::endl;
+			//std::cout << "key = " << key << " value = " << value << std::endl;
 			struct_element_map[key] = value;							
 		}	
 	}
@@ -92,11 +97,72 @@ bool isDSTRUCT(string s){
 	return (s.find("DSTRUCT") != string::npos);
 }
 
+//	DSTRUCT:t827,8:Size|2
+string getTaintNo(string s){
+	size_t found = s.find_first_of(":");
+	size_t end = s.find_last_of(",");
+	string taintNo =  s.substr(found+1,end - found - 1);
+	return taintNo;	
+}
+
+//	DSTRUCT:t827,8:Size|2
+string getOffset(string s){
+	size_t found = s.find_first_of(",");
+	size_t end = s.find_last_of(":");
+	string offset = s.substr(found+1,end-found-1);
+	return offset;
+}
+
+int getBlockNo(string taintNo){
+	taintNo+= "=";	// prepare taintNo for searching through taint string
+	ifstream trace_file(traceFile);
+	string line;
+//	std::cout << "trying to find " << taintNo << " in trace file " << traceFile << std::endl;
+	while(std::getline(trace_file,line)){
+		if(line.find(taintNo) != std::string::npos){
+	//		std::cout << "FOUND " << taintNo << " in " << line << std::endl;
+			break;
+		}
+	}
+	// got line like this:t9=B(64,0,t4,t8, 9)
+	if(line.find("B") == std::string::npos)
+		return -1;
+	size_t found = line.find_first_of(",");
+	string rest = line.substr(found+1,line.size());
+	found = rest.find_first_of(",");
+	string blockNum = rest.substr(0,found);
+	if(blockNum.size() == 0)		
+		return -1;						
+	
+//	std::cout << "Block Num = " << blockNum << std::endl;
+	istringstream buffer(blockNum);
+	int bnum;
+	buffer >> bnum;
+	return bnum;
+}
+
+int getAddress(string taintNo, string offset){
+	int blockNo = getBlockNo(taintNo);	
+	int off;
+	stringstream buffer(offset);
+	buffer >> off;
+	if (blockNo < 0){
+//		std::cout << __func__ << "():could not find block " << std::endl;
+		return -1;
+	}
+//	std::cout << "blockNo = " << blockNo << std::endl;
+	return (blockNo * BLOCK_SIZE) + off;
+}
+
 //	DSTRUCT:Addr=A:Size|S
 string getAddress(string s){
-	size_t found = s.find_first_of("=");
-	size_t end = s.find_last_of(":");
-	return s.substr(found+1,end - found - 1); 
+	string taintNo = getTaintNo(s);
+	string offset = getOffset(s);	
+	int addr = getAddress(taintNo, offset);						
+	if (addr < 0)
+		return string("");
+//	std::cout << "Address received" << addr << std::endl;
+	return std::to_string(addr);
 }
 
 string getSize(string s){
@@ -195,7 +261,7 @@ string getKey(string s){
 }
 
 bool isValid(string A){
-	return A.compare("999999");
+	return !(A.empty());
 }
 
 string getValue(string key1, string key2){
@@ -205,7 +271,7 @@ string getValue(string key1, string key2){
 		value1 = struct_element_map[key1];
 	}
 	if (value1.empty()){
-		std::cout << "Cant find key" << key1 << " in struct_element_map" << std::endl;
+//		std::cout << "Cant find key" << key1 << " in struct_element_map" << std::endl;
 		return value1;	// return NULL
 	}
 
@@ -229,7 +295,7 @@ int main(int argc, char *argv[]){
 	
 	ifstream dict_file(argv[1]);
 	if (!dict_file) {
-		cout << "unable to open file";
+//		cout << "unable to open file";
 		exit(1);
 	}	
 
@@ -241,6 +307,7 @@ int main(int argc, char *argv[]){
 	//	<function:variable2>
 
 	ifstream trace_file(argv[2]);
+	traceFile.append(argv[2]);
 	
 	string s;
 	string Address;	
@@ -250,15 +317,15 @@ int main(int argc, char *argv[]){
 
 	while(std::getline(trace_file,s)){
 		if(isDSTRUCT(s)){
-			//std::cout << "Identified DSTRUCT in s " << s << std::endl;
+	//		std::cout << "Identified DSTRUCT in s " << s << std::endl;
 			Address = getAddress(s);
 			Size = getSize(s);
-//			std::cout << "Extracted Addr " << Address << " Extract Size " << Size << std::endl;
+	//		std::cout << "Extracted Addr " << Address << " Extract Size " << Size << std::endl;
 			std::getline(trace_file,s);		
-//			std::cout << "Next Line " << s << std::endl;
+	//		std::cout << "Next Line " << s << std::endl;
 			key1 = getKey(s);
-	//		std::cout << "Funname = " << funName << std::endl;
-			
+	//		std::cout << "key1 " << key1 << std::endl;		
+	
 			if(!key1.empty()){
 		//		std::cout << "In string " << s << " Obtained Key " << key1 << std::endl;
 				std::getline(trace_file,s);		
