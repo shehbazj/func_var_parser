@@ -314,12 +314,16 @@ int main(int argc, char *argv[]){
 	string Size;
 	string key1, key2;
 	string diskBlockType;	
+	stringstream buffer;
 
 	while(std::getline(trace_file,s)){
 		if(isDSTRUCT(s)){
 	//		std::cout << "Identified DSTRUCT in s " << s << std::endl;
 			Address = getAddress(s);
 			Size = getSize(s);
+			stringstream buffer(Size);
+			int size;
+			buffer >> size;
 	//		std::cout << "Extracted Addr " << Address << " Extract Size " << Size << std::endl;
 			std::getline(trace_file,s);		
 	//		std::cout << "Next Line " << s << std::endl;
@@ -333,9 +337,16 @@ int main(int argc, char *argv[]){
 		//		std::cout << "In string " << s << " Obtained Key " << key2 << std::endl;
 				diskBlockType = getValue(key1, key2);
 		//		std::cout << "diskBlockType " << diskBlockType << std::endl; 
-				if(!diskBlockType.empty() && isValid(Address))
-					std::cout << Address << ":" << Size 
+				if(!diskBlockType.empty() && isValid(Address)){
+					//stringstream 
+					stringstream buffer(Address);
+					int addr;
+					buffer >> addr;
+					int bnum = addr / BLOCK_SIZE;
+					int off = addr % BLOCK_SIZE;
+					std::cout << "BLOCK:" << bnum << ":" << off << ":" << off+ size -1
 						<< ":" << diskBlockType << std::endl;	
+				}
 			}
 		}
 	}
